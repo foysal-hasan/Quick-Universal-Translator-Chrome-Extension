@@ -40,7 +40,8 @@ function showTranslationBubble(payload) {
     translated = "",
     isError = false,
     sourceLanguageName = "Auto",
-    targetLanguageName = "Target"
+    targetLanguageName = "Target",
+    showOriginalText = true
   } = payload;
   const bubble = ensureBubble();
 
@@ -56,7 +57,8 @@ function showTranslationBubble(payload) {
     ? "Translation Error"
     : `Translation: ${sourceLanguageName} -> ${targetLanguageName}`;
   translatedNode.textContent = translated || "No translation available.";
-  originalNode.textContent = original ? `Original: ${original}` : "";
+  originalNode.textContent = showOriginalText && original ? `Original: ${original}` : "";
+  originalNode.style.display = showOriginalText ? "block" : "none";
   bubble.classList.remove("qbt-hidden", "qbt-error");
   bubble.classList.toggle("qbt-error", Boolean(isError));
 }

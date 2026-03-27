@@ -1,7 +1,8 @@
 const MENU_ID = "translate-selection";
 
 const DEFAULT_SETTINGS = {
-  targetLanguage: "bn"
+  targetLanguage: "bn",
+  showOriginalText: true
 };
 
 const LANGUAGE_NAMES = {
@@ -71,9 +72,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message?.type === "SET_SETTINGS") {
     const targetLanguage = normalizeLanguage(message?.settings?.targetLanguage);
-    chrome.storage.sync.set({ targetLanguage }).then(async () => {
+    const showOriginalText = normalizeShowOriginalText(message?.settings?.showOriginalText);
+    chrome.storage.sync.set({ targetLanguage, showOriginalText }).then(async () => {
       await syncContextMenuTitle();
-      sendResponse({ ok: true, settings: { targetLanguage } });
+      sendResponse({ ok: true, settings: { targetLanguage, showOriginalText } });
     });
     return true;
   }
@@ -169,14 +171,15 @@ async function bootstrap() {
 }
 
 async function getSettings() {
-  const data = await chrome.storage.sync.get(["targetLanguage"]);
+  const data = await chrome.storage.sync.get(["targetLanguage", "showOriginalText"]);
   return {
-    targetLanguage: normalizeLanguage(data.targetLanguage)
+    targetLanguage: normalizeLanguage(data.targetLanguage),
+    showOriginalText: normalizeShowOriginalText(data.showOriginalText)
   };
 }
 
 async function translateAndSend(tabId, text) {
-  const { targetLanguage } = await getSettings();
+  const { targetLanguage, showOriginalText } = await getSettings();
 
   try {
     const result = await translateText(text, targetLanguage);
@@ -185,7 +188,8 @@ async function translateAndSend(tabId, text) {
       translated: result.translated,
       isError: false,
       sourceLanguageName: getLanguageName(result.detectedSourceLanguage),
-      targetLanguageName: getLanguageName(targetLanguage)
+      targetLanguageName: getLanguageName(targetLanguage),
+      showOriginalText
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Translation failed.";
@@ -194,7 +198,8 @@ async function translateAndSend(tabId, text) {
       translated: message,
       isError: true,
       sourceLanguageName: "",
-      targetLanguageName: getLanguageName(targetLanguage)
+      targetLanguageName: getLanguageName(targetLanguage),
+      showOriginalText
     });
   }
 }
@@ -383,12 +388,16 @@ async function showFallbackBubble(tabId, payload) {
 
         const sourceName = injectedPayload.sourceLanguageName || "Auto";
         const targetName = injectedPayload.targetLanguageName || "Target";
+        const showOriginalText = injectedPayload.showOriginalText !== false;
 
         titleNode.textContent = injectedPayload.isError
           ? "Translation Error"
           : `Translation: ${sourceName} -> ${targetName}`;
         translatedNode.textContent = injectedPayload.translated || "No translation available.";
-        originalNode.textContent = injectedPayload.original ? `Original: ${injectedPayload.original}` : "";
+        originalNode.textContent = showOriginalText && injectedPayload.original
+          ? `Original: ${injectedPayload.original}`
+          : "";
+        originalNode.style.display = showOriginalText ? "block" : "none";
         bubble.style.display = "block";
       }
     });
@@ -412,4 +421,8 @@ function normalizeLanguage(languageCode) {
 
 function getLanguageName(languageCode) {
   return LANGUAGE_NAMES[languageCode] || languageCode || "Unknown";
+}
+
+function normalizeShowOriginalText(value) {
+  return typeof value === "boolean" ? value : DEFAULT_SETTINGS.showOriginalText;
 }

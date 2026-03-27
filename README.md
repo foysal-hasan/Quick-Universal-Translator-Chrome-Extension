@@ -9,6 +9,7 @@ Translate selected text from any language to your chosen target language using o
 - Source language is auto-detected from selected text
 - Result shows in a floating bubble on the same page with detected source and target languages
 - Copy translated text with one click
+- Toggle to show or hide original text below the translation
 
 ## Install (Unpacked)
 
@@ -20,7 +21,7 @@ Translate selected text from any language to your chosen target language using o
 
 ## Usage
 
-1. Open extension popup and choose your target language
+1. Open extension popup and choose your target language and original-text visibility
 2. Select text on any web page
 2. Use one of these:
    - Right-click -> **Translate to your selected target language**
@@ -45,7 +46,7 @@ This extension uses a free public translation endpoint from Google Translate (`t
 ## Files
 
 - `manifest.json` - Extension config
-- `background.js` - Menu/shortcut logic, language settings, and translation request
+- `background-v2.js` - Menu/shortcut logic, language settings, and translation request
 - `content.js` - Selection capture and bubble rendering
 - `styles/bubble.css` - Bubble UI styles
 - `popup/popup.html` - Language settings UI

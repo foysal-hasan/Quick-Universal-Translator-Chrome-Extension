@@ -35,6 +35,7 @@ const LANGUAGES = [
 ];
 
 const targetSelect = document.getElementById("targetLanguage");
+const showOriginalToggle = document.getElementById("showOriginalText");
 const statusNode = document.getElementById("status");
 
 init().catch(() => {
@@ -46,21 +47,26 @@ async function init() {
 
   const response = await sendMessage({ type: "GET_SETTINGS" });
   const selectedTarget = response?.settings?.targetLanguage || "bn";
+  const showOriginalText = response?.settings?.showOriginalText !== false;
   targetSelect.value = hasLanguage(selectedTarget) ? selectedTarget : "bn";
+  showOriginalToggle.checked = showOriginalText;
 
-  targetSelect.addEventListener("change", async () => {
-    setStatus("Saving...");
+  targetSelect.addEventListener("change", saveSettings);
+  showOriginalToggle.addEventListener("change", saveSettings);
+}
 
-    const value = targetSelect.value;
-    await sendMessage({
-      type: "SET_SETTINGS",
-      settings: {
-        targetLanguage: value
-      }
-    });
+async function saveSettings() {
+  setStatus("Saving...");
 
-    setStatus("Saved.");
+  await sendMessage({
+    type: "SET_SETTINGS",
+    settings: {
+      targetLanguage: targetSelect.value,
+      showOriginalText: showOriginalToggle.checked
+    }
   });
+
+  setStatus("Saved.");
 }
 
 function renderLanguageOptions() {
