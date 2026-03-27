@@ -1,0 +1,75 @@
+.qbt-bubble {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(60vh, 520px);
+  overflow: auto;
+  z-index: 2147483647;
+  color: #11293b;
+  background: linear-gradient(145deg, #f6fbff, #e9f5ff);
+  border: 1px solid #8dbfe6;
+  border-radius: 12px;
+  box-shadow: 0 16px 30px rgba(0, 45, 89, 0.24);
+  font: 14px/1.45 "Segoe UI", Tahoma, sans-serif;
+  padding: 12px;
+}
+
+.qbt-hidden {
+  display: none;
+}
+
+.qbt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.qbt-title {
+  font-weight: 700;
+  color: #0c4f83;
+}
+
+.qbt-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.qbt-btn {
+  border: 1px solid #8dbfe6;
+  background: #ffffff;
+  color: #0b3e64;
+  border-radius: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.qbt-btn:hover {
+  background: #eff7ff;
+}
+
+.qbt-translated {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #ffffff;
+  white-space: pre-wrap;
+  color: #0f2b40;
+}
+
+.qbt-original {
+  margin-top: 8px;
+  color: #4b6377;
+  font-size: 12px;
+}
+
+.qbt-error {
+  border-color: #d36f6f;
+  background: linear-gradient(145deg, #fff6f6, #ffeaea);
+}
+
+.qbt-error .qbt-title {
+  color: #8d1f1f;
+}

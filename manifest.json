@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Quick Bangla Translator",
+  "description": "Select English text and translate it to Bangla from context menu or keyboard shortcut.",
+  "version": "1.0.0",
+  "permissions": ["contextMenus", "activeTab", "scripting"],
+  "host_permissions": ["https://translate.googleapis.com/*", "file:///*"],
+  "icons": {
+    "16": "assets/icons/icon16.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["styles/bubble.css"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "commands": {
+    "translate-selection": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+B",
+        "mac": "Command+Shift+B"
+      },
+      "description": "Translate selected text to Bangla"
+    }
+  },
+  "action": {
+    "default_title": "Quick Bangla Translator",
+    "default_icon": {
+      "16": "assets/icons/icon16.png",
+      "48": "assets/icons/icon48.png",
+      "128": "assets/icons/icon128.png"
+    }
+  }
+}
