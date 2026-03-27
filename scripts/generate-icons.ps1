@@ -36,7 +36,7 @@ foreach ($s in $sizes) {
 
   $g.Clear([System.Drawing.Color]::Transparent)
 
-  $pad = [Math]::Max([float]($s * 0.07), 1)
+  $pad = [Math]::Max([float]($s * 0.03), 1)
   $tileSize = $s - (2 * $pad)
   $radius = [Math]::Max([float]($s * 0.22), 2)
   $tilePath = New-RoundedRectPath -x $pad -y $pad -w $tileSize -h $tileSize -r $radius
