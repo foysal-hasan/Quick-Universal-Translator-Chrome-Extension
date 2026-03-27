@@ -65,8 +65,6 @@ async function init() {
   targetSelect.addEventListener("change", saveSettings);
   showOriginalToggle.addEventListener("change", saveSettings);
   bubblePositionSelect.addEventListener("change", saveSettings);
-
-  document.addEventListener("keydown", handleKeyboardShortcuts);
 }
 
 async function saveSettings() {
@@ -130,67 +128,4 @@ function sendMessage(message) {
       resolve(response);
     });
   });
-}
-
-function handleKeyboardShortcuts(event) {
-  if (!event.ctrlKey) return;
-
-  const key = event.key.toLowerCase();
-
-  // Ctrl+1 to Ctrl+9: Select language
-  if (key >= "1" && key <= "9") {
-    event.preventDefault();
-    const languageIndex = parseInt(key) - 1;
-    if (languageIndex < LANGUAGES.length) {
-      targetSelect.value = LANGUAGES[languageIndex].code;
-      setStatus(`Changed to ${LANGUAGES[languageIndex].name}`);
-      saveSettings();
-    }
-    return;
-  }
-
-  // Ctrl+T: Toggle original text
-  if (key === "t") {
-    event.preventDefault();
-    showOriginalToggle.checked = !showOriginalToggle.checked;
-    setStatus(`Original text ${showOriginalToggle.checked ? "enabled" : "disabled"}`);
-    saveSettings();
-    return;
-  }
-
-  // Ctrl+L: Bottom Left
-  if (key === "l") {
-    event.preventDefault();
-    bubblePositionSelect.value = "bottom-left";
-    setStatus("Position: Bottom Left");
-    saveSettings();
-    return;
-  }
-
-  // Ctrl+R: Bottom Right
-  if (key === "r") {
-    event.preventDefault();
-    bubblePositionSelect.value = "bottom-right";
-    setStatus("Position: Bottom Right");
-    saveSettings();
-    return;
-  }
-
-  // Ctrl+K: Top Left
-  if (key === "k") {
-    event.preventDefault();
-    bubblePositionSelect.value = "top-left";
-    setStatus("Position: Top Left");
-    saveSettings();
-    return;
-  }
-
-  // Ctrl+U: Top Right
-  if (key === "u") {
-    event.preventDefault();
-    bubblePositionSelect.value = "top-right";
-    setStatus("Position: Top Right");
-    saveSettings();
-    return;
-  }
 }
