@@ -10,6 +10,7 @@ Translate selected text from any language to your chosen target language using o
 - Result shows in a floating bubble on the same page with detected source and target languages
 - Copy translated text with one click
 - Toggle to show or hide original text below the translation
+- Choose bubble position on screen (top-left, top-right, bottom-left, bottom-right)
 
 ## Install (Unpacked)
 
@@ -21,7 +22,7 @@ Translate selected text from any language to your chosen target language using o
 
 ## Usage
 
-1. Open extension popup and choose your target language and original-text visibility
+1. Open extension popup and choose target language, original-text visibility, and bubble position
 2. Select text on any web page
 2. Use one of these:
    - Right-click -> **Translate to your selected target language**

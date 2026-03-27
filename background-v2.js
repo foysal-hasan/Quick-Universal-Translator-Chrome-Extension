@@ -2,8 +2,16 @@ const MENU_ID = "translate-selection";
 
 const DEFAULT_SETTINGS = {
   targetLanguage: "bn",
-  showOriginalText: true
+  showOriginalText: true,
+  bubblePosition: "bottom-right"
 };
+
+const BUBBLE_POSITIONS = new Set([
+  "bottom-right",
+  "bottom-left",
+  "top-right",
+  "top-left"
+]);
 
 const LANGUAGE_NAMES = {
   auto: "Auto Detect",
@@ -73,9 +81,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "SET_SETTINGS") {
     const targetLanguage = normalizeLanguage(message?.settings?.targetLanguage);
     const showOriginalText = normalizeShowOriginalText(message?.settings?.showOriginalText);
-    chrome.storage.sync.set({ targetLanguage, showOriginalText }).then(async () => {
+    const bubblePosition = normalizeBubblePosition(message?.settings?.bubblePosition);
+    chrome.storage.sync.set({ targetLanguage, showOriginalText, bubblePosition }).then(async () => {
       await syncContextMenuTitle();
-      sendResponse({ ok: true, settings: { targetLanguage, showOriginalText } });
+      sendResponse({ ok: true, settings: { targetLanguage, showOriginalText, bubblePosition } });
     });
     return true;
   }
@@ -90,12 +99,15 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
   const selectedText = (info.selectionText || "").trim();
   if (!selectedText) {
+    const { targetLanguage, showOriginalText, bubblePosition } = await getSettings();
     await sendResult(tab.id, {
       original: "",
       translated: "No text selected.",
       isError: true,
       sourceLanguageName: "",
-      targetLanguageName: ""
+      targetLanguageName: getLanguageName(targetLanguage),
+      showOriginalText,
+      bubblePosition
     });
     return;
   }
@@ -115,12 +127,15 @@ chrome.commands.onCommand.addListener(async (command) => {
 
   const selectedText = await getSelectionFromTab(tab.id);
   if (!selectedText) {
+    const { targetLanguage, showOriginalText, bubblePosition } = await getSettings();
     await sendResult(tab.id, {
       original: "",
       translated: "No text selected. On PDF pages, use right-click on selected text.",
       isError: true,
       sourceLanguageName: "",
-      targetLanguageName: ""
+      targetLanguageName: getLanguageName(targetLanguage),
+      showOriginalText,
+      bubblePosition
     });
     return;
   }
@@ -171,15 +186,16 @@ async function bootstrap() {
 }
 
 async function getSettings() {
-  const data = await chrome.storage.sync.get(["targetLanguage", "showOriginalText"]);
+  const data = await chrome.storage.sync.get(["targetLanguage", "showOriginalText", "bubblePosition"]);
   return {
     targetLanguage: normalizeLanguage(data.targetLanguage),
-    showOriginalText: normalizeShowOriginalText(data.showOriginalText)
+    showOriginalText: normalizeShowOriginalText(data.showOriginalText),
+    bubblePosition: normalizeBubblePosition(data.bubblePosition)
   };
 }
 
 async function translateAndSend(tabId, text) {
-  const { targetLanguage, showOriginalText } = await getSettings();
+  const { targetLanguage, showOriginalText, bubblePosition } = await getSettings();
 
   try {
     const result = await translateText(text, targetLanguage);
@@ -189,7 +205,8 @@ async function translateAndSend(tabId, text) {
       isError: false,
       sourceLanguageName: getLanguageName(result.detectedSourceLanguage),
       targetLanguageName: getLanguageName(targetLanguage),
-      showOriginalText
+      showOriginalText,
+      bubblePosition
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Translation failed.";
@@ -199,7 +216,8 @@ async function translateAndSend(tabId, text) {
       isError: true,
       sourceLanguageName: "",
       targetLanguageName: getLanguageName(targetLanguage),
-      showOriginalText
+      showOriginalText,
+      bubblePosition
     });
   }
 }
@@ -389,6 +407,12 @@ async function showFallbackBubble(tabId, payload) {
         const sourceName = injectedPayload.sourceLanguageName || "Auto";
         const targetName = injectedPayload.targetLanguageName || "Target";
         const showOriginalText = injectedPayload.showOriginalText !== false;
+        const bubblePosition =
+          typeof injectedPayload.bubblePosition === "string"
+            ? injectedPayload.bubblePosition
+            : "bottom-right";
+
+        applyPosition(bubble, bubblePosition);
 
         titleNode.textContent = injectedPayload.isError
           ? "Translation Error"
@@ -399,6 +423,34 @@ async function showFallbackBubble(tabId, payload) {
           : "";
         originalNode.style.display = showOriginalText ? "block" : "none";
         bubble.style.display = "block";
+
+        function applyPosition(node, position) {
+          node.style.top = "";
+          node.style.right = "";
+          node.style.bottom = "";
+          node.style.left = "";
+
+          if (position === "top-left") {
+            node.style.top = "16px";
+            node.style.left = "16px";
+            return;
+          }
+
+          if (position === "top-right") {
+            node.style.top = "16px";
+            node.style.right = "16px";
+            return;
+          }
+
+          if (position === "bottom-left") {
+            node.style.bottom = "16px";
+            node.style.left = "16px";
+            return;
+          }
+
+          node.style.bottom = "16px";
+          node.style.right = "16px";
+        }
       }
     });
   } catch {
@@ -425,4 +477,10 @@ function getLanguageName(languageCode) {
 
 function normalizeShowOriginalText(value) {
   return typeof value === "boolean" ? value : DEFAULT_SETTINGS.showOriginalText;
+}
+
+function normalizeBubblePosition(value) {
+  return typeof value === "string" && BUBBLE_POSITIONS.has(value)
+    ? value
+    : DEFAULT_SETTINGS.bubblePosition;
 }

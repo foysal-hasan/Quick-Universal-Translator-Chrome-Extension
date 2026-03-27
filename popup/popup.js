@@ -34,8 +34,16 @@ const LANGUAGES = [
   { code: "hu", name: "Hungarian" }
 ];
 
+const POSITIONS = [
+  { code: "bottom-right", name: "Bottom Right" },
+  { code: "bottom-left", name: "Bottom Left" },
+  { code: "top-right", name: "Top Right" },
+  { code: "top-left", name: "Top Left" }
+];
+
 const targetSelect = document.getElementById("targetLanguage");
 const showOriginalToggle = document.getElementById("showOriginalText");
+const bubblePositionSelect = document.getElementById("bubblePosition");
 const statusNode = document.getElementById("status");
 
 init().catch(() => {
@@ -44,15 +52,19 @@ init().catch(() => {
 
 async function init() {
   renderLanguageOptions();
+  renderPositionOptions();
 
   const response = await sendMessage({ type: "GET_SETTINGS" });
   const selectedTarget = response?.settings?.targetLanguage || "bn";
   const showOriginalText = response?.settings?.showOriginalText !== false;
+  const bubblePosition = response?.settings?.bubblePosition || "bottom-right";
   targetSelect.value = hasLanguage(selectedTarget) ? selectedTarget : "bn";
   showOriginalToggle.checked = showOriginalText;
+  bubblePositionSelect.value = hasPosition(bubblePosition) ? bubblePosition : "bottom-right";
 
   targetSelect.addEventListener("change", saveSettings);
   showOriginalToggle.addEventListener("change", saveSettings);
+  bubblePositionSelect.addEventListener("change", saveSettings);
 }
 
 async function saveSettings() {
@@ -62,7 +74,8 @@ async function saveSettings() {
     type: "SET_SETTINGS",
     settings: {
       targetLanguage: targetSelect.value,
-      showOriginalText: showOriginalToggle.checked
+      showOriginalText: showOriginalToggle.checked,
+      bubblePosition: bubblePositionSelect.value
     }
   });
 
@@ -80,8 +93,23 @@ function renderLanguageOptions() {
   targetSelect.replaceChildren(...options);
 }
 
+function renderPositionOptions() {
+  const options = POSITIONS.map((position) => {
+    const option = document.createElement("option");
+    option.value = position.code;
+    option.textContent = position.name;
+    return option;
+  });
+
+  bubblePositionSelect.replaceChildren(...options);
+}
+
 function hasLanguage(code) {
   return LANGUAGES.some((lang) => lang.code === code);
+}
+
+function hasPosition(code) {
+  return POSITIONS.some((position) => position.code === code);
 }
 
 function setStatus(text, isError = false) {

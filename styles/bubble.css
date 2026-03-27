@@ -1,7 +1,5 @@
 .qbt-bubble {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
   width: min(420px, calc(100vw - 24px));
   max-height: min(60vh, 520px);
   overflow: auto;
@@ -13,6 +11,26 @@
   box-shadow: 0 16px 30px rgba(0, 45, 89, 0.24);
   font: 14px/1.45 "Segoe UI", Tahoma, sans-serif;
   padding: 12px;
+}
+
+.qbt-pos-bottom-right {
+  right: 16px;
+  bottom: 16px;
+}
+
+.qbt-pos-bottom-left {
+  left: 16px;
+  bottom: 16px;
+}
+
+.qbt-pos-top-right {
+  right: 16px;
+  top: 16px;
+}
+
+.qbt-pos-top-left {
+  left: 16px;
+  top: 16px;
 }
 
 .qbt-hidden {

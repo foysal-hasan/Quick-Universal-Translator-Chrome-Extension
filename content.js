@@ -41,7 +41,8 @@ function showTranslationBubble(payload) {
     isError = false,
     sourceLanguageName = "Auto",
     targetLanguageName = "Target",
-    showOriginalText = true
+    showOriginalText = true,
+    bubblePosition = "bottom-right"
   } = payload;
   const bubble = ensureBubble();
 
@@ -59,8 +60,27 @@ function showTranslationBubble(payload) {
   translatedNode.textContent = translated || "No translation available.";
   originalNode.textContent = showOriginalText && original ? `Original: ${original}` : "";
   originalNode.style.display = showOriginalText ? "block" : "none";
+  applyBubblePositionClass(bubble, bubblePosition);
   bubble.classList.remove("qbt-hidden", "qbt-error");
   bubble.classList.toggle("qbt-error", Boolean(isError));
+}
+
+function applyBubblePositionClass(bubble, bubblePosition) {
+  const classes = [
+    "qbt-pos-bottom-right",
+    "qbt-pos-bottom-left",
+    "qbt-pos-top-right",
+    "qbt-pos-top-left"
+  ];
+  bubble.classList.remove(...classes);
+
+  const nextClass = `qbt-pos-${bubblePosition}`;
+  if (classes.includes(nextClass)) {
+    bubble.classList.add(nextClass);
+    return;
+  }
+
+  bubble.classList.add("qbt-pos-bottom-right");
 }
 
 function ensureBubble() {
@@ -71,7 +91,7 @@ function ensureBubble() {
 
   bubble = document.createElement("div");
   bubble.id = BUBBLE_ID;
-  bubble.className = "qbt-bubble qbt-hidden";
+  bubble.className = "qbt-bubble qbt-hidden qbt-pos-bottom-right";
 
   bubble.innerHTML = `
     <div class="qbt-header">
