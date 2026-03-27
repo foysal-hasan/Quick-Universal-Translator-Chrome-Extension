@@ -35,7 +35,13 @@ function getSelectedText() {
 }
 
 function showTranslationBubble(payload) {
-  const { original = "", translated = "", isError = false } = payload;
+  const {
+    original = "",
+    translated = "",
+    isError = false,
+    sourceLanguageName = "Auto",
+    targetLanguageName = "Target"
+  } = payload;
   const bubble = ensureBubble();
 
   const title = bubble.querySelector(".qbt-title");
@@ -46,7 +52,9 @@ function showTranslationBubble(payload) {
     return;
   }
 
-  title.textContent = isError ? "Translation Error" : "Bangla Translation";
+  title.textContent = isError
+    ? "Translation Error"
+    : `Translation: ${sourceLanguageName} -> ${targetLanguageName}`;
   translatedNode.textContent = translated || "No translation available.";
   originalNode.textContent = original ? `Original: ${original}` : "";
   bubble.classList.remove("qbt-hidden", "qbt-error");
@@ -65,7 +73,7 @@ function ensureBubble() {
 
   bubble.innerHTML = `
     <div class="qbt-header">
-      <div class="qbt-title">Bangla Translation</div>
+      <div class="qbt-title">Translation</div>
       <div class="qbt-actions">
         <button class="qbt-btn" data-action="copy" title="Copy translated text">Copy</button>
         <button class="qbt-btn" data-action="close" title="Close">Close</button>

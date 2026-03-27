@@ -1,0 +1,48 @@
+body {
+  margin: 0;
+  min-width: 280px;
+  background: linear-gradient(160deg, #f5fbff, #e8f4ff);
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  color: #12324a;
+}
+
+.popup {
+  padding: 14px;
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  color: #0d4c7e;
+}
+
+.subtitle {
+  margin: 8px 0 12px;
+  font-size: 12px;
+  color: #476175;
+}
+
+.label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 6px;
+  color: #184a6f;
+  font-weight: 600;
+}
+
+.select {
+  width: 100%;
+  border: 1px solid #88b6d9;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 14px;
+  background: #fff;
+  color: #10314a;
+}
+
+.status {
+  min-height: 18px;
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #25603f;
+}
