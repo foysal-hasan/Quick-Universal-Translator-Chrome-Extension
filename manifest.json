@@ -23,15 +23,6 @@
       "all_frames": true
     }
   ],
-  "commands": {
-    "translate-selection": {
-      "suggested_key": {
-        "default": "Ctrl+Shift+B",
-        "mac": "Command+Shift+B"
-      },
-      "description": "Translate selected text to Bangla"
-    }
-  },
   "action": {
     "default_title": "Quick Universal Translator",
     "default_popup": "popup/popup.html",

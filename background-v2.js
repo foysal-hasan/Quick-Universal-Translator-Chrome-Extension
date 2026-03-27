@@ -115,34 +115,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   await translateAndSend(tab.id, selectedText);
 });
 
-chrome.commands.onCommand.addListener(async (command) => {
-  if (command !== "translate-selection") {
-    return;
-  }
-
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) {
-    return;
-  }
-
-  const selectedText = await getSelectionFromTab(tab.id);
-  if (!selectedText) {
-    const { targetLanguage, showOriginalText, bubblePosition } = await getSettings();
-    await sendResult(tab.id, {
-      original: "",
-      translated: "No text selected. On PDF pages, use right-click on selected text.",
-      isError: true,
-      sourceLanguageName: "",
-      targetLanguageName: getLanguageName(targetLanguage),
-      showOriginalText,
-      bubblePosition
-    });
-    return;
-  }
-
-  await translateAndSend(tab.id, selectedText);
-});
-
 async function ensureDefaultSettings() {
   const current = await chrome.storage.sync.get(Object.keys(DEFAULT_SETTINGS));
   const next = {};
