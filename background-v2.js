@@ -1,10 +1,14 @@
 const MENU_ID = "translate-selection";
+const OFFSCREEN_CLIPBOARD_PATH = "offscreen/clipboard.html";
+const OFFSCREEN_CLIPBOARD_TARGET = "OFFSCREEN_CLIPBOARD";
 
 const DEFAULT_SETTINGS = {
   targetLanguage: "bn",
   showOriginalText: true,
   bubblePosition: "bottom-right"
 };
+const CLIPBOARD_FALLBACK_WAIT_MS = 150;
+const DEBUGGER_PROTOCOL_VERSION = "1.3";
 
 const BUBBLE_POSITIONS = new Set([
   "bottom-right",
@@ -92,17 +96,68 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return false;
 });
 
-chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  if (info.menuItemId !== MENU_ID || !tab?.id) {
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command !== "translate-selection") {
     return;
   }
 
-  const selectedText = (info.selectionText || "").trim();
-  if (!selectedText) {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) {
+    return;
+  }
+
+  console.log("[QBT] Alt+T triggered", {
+    tabId: tab.id,
+    url: tab.url || "",
+    title: tab.title || ""
+  });
+
+  const isPDF = isLikelyPdfTab(tab);
+
+  let selectedText = await getSelectionFromTab(tab.id);
+  if (selectedText) {
+    console.log("[QBT] Selection found via content message", { length: selectedText.length });
+  }
+
+  // Try PDF specific extraction when regular selection is unavailable.
+  if (!selectedText && isPDF) {
+    selectedText = await extractFromPDFViewer(tab.id);
+    if (selectedText) {
+      console.log("[QBT] Selection found via PDF viewer extraction", { length: selectedText.length });
+    }
+  }
+
+  // Last-resort PDF fallback: copy selection and read it from clipboard.
+  if (!selectedText && isPDF) {
+    selectedText = await getRecentCopiedTextFromTab(tab.id);
+    if (selectedText) {
+      console.log("[QBT] Selection found via recent Ctrl+C cache", { length: selectedText.length });
+    }
+  }
+
+  // Last-resort PDF fallback: copy selection and read it from clipboard.
+  if (!selectedText && isPDF) {
+    selectedText = await getPdfSelectionViaClipboard(tab.id);
+    if (selectedText) {
+      console.log("[QBT] Selection found via clipboard fallback", { length: selectedText.length });
+    }
+  }
+
+  const normalizedText = normalizeSelectedText(selectedText, { isPDF });
+  if (selectedText && !normalizedText) {
+    console.log("[QBT] Selected text became empty after normalization", {
+      tabId: tab.id,
+      isPDF
+    });
+  }
+
+  if (!normalizedText) {
     const { targetLanguage, showOriginalText, bubblePosition } = await getSettings();
+    const message = getNoTextMessage(isPDF);
+    
     await sendResult(tab.id, {
       original: "",
-      translated: "No text selected.",
+      translated: message,
       isError: true,
       sourceLanguageName: "",
       targetLanguageName: getLanguageName(targetLanguage),
@@ -112,7 +167,31 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     return;
   }
 
-  await translateAndSend(tab.id, selectedText);
+  await translateAndSend(tab.id, normalizedText);
+});
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId !== MENU_ID || !tab?.id) {
+    return;
+  }
+
+  const isPDF = isLikelyPdfTab(tab);
+  const normalizedText = normalizeSelectedText(info.selectionText || "", { isPDF });
+  if (!normalizedText) {
+    const { targetLanguage, showOriginalText, bubblePosition } = await getSettings();
+    await sendResult(tab.id, {
+      original: "",
+      translated: getNoTextMessage(isPDF),
+      isError: true,
+      sourceLanguageName: "",
+      targetLanguageName: getLanguageName(targetLanguage),
+      showOriginalText,
+      bubblePosition
+    });
+    return;
+  }
+
+  await translateAndSend(tab.id, normalizedText);
 });
 
 async function ensureDefaultSettings() {
@@ -120,7 +199,7 @@ async function ensureDefaultSettings() {
   const next = {};
 
   for (const key of Object.keys(DEFAULT_SETTINGS)) {
-    if (!current[key]) {
+    if (typeof current[key] === "undefined") {
       next[key] = DEFAULT_SETTINGS[key];
     }
   }
@@ -168,6 +247,19 @@ async function getSettings() {
 
 async function translateAndSend(tabId, text) {
   const { targetLanguage, showOriginalText, bubblePosition } = await getSettings();
+  const targetLanguageName = getLanguageName(targetLanguage);
+
+  // Show loading state
+  await sendResult(tabId, {
+    original: text,
+    translated: "Translating...",
+    isError: false,
+    isLoading: true,
+    sourceLanguageName: "",
+    targetLanguageName,
+    showOriginalText,
+    bubblePosition
+  });
 
   try {
     const result = await translateText(text, targetLanguage);
@@ -175,8 +267,9 @@ async function translateAndSend(tabId, text) {
       original: text,
       translated: result.translated,
       isError: false,
+      isLoading: false,
       sourceLanguageName: getLanguageName(result.detectedSourceLanguage),
-      targetLanguageName: getLanguageName(targetLanguage),
+      targetLanguageName,
       showOriginalText,
       bubblePosition
     });
@@ -186,8 +279,9 @@ async function translateAndSend(tabId, text) {
       original: text,
       translated: message,
       isError: true,
+      isLoading: false,
       sourceLanguageName: "",
-      targetLanguageName: getLanguageName(targetLanguage),
+      targetLanguageName,
       showOriginalText,
       bubblePosition
     });
@@ -221,11 +315,410 @@ async function translateText(text, targetLanguage) {
   };
 }
 
+async function tryClipboardFallback(tabId) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      world: "MAIN",
+      func: () => {
+        try {
+          const isMac = navigator.platform.toLowerCase().includes("mac");
+          const target = document.activeElement || document.body || document.documentElement;
+          if (target && typeof target.focus === "function") {
+            target.focus();
+          }
+
+          // Fire synthetic Ctrl/Cmd+C sequence for viewers that handle keyboard shortcuts internally.
+          const downEvent = new KeyboardEvent("keydown", {
+            key: "c",
+            code: "KeyC",
+            keyCode: 67,
+            which: 67,
+            ctrlKey: !isMac,
+            metaKey: isMac,
+            bubbles: true,
+            cancelable: true
+          });
+          const upEvent = new KeyboardEvent("keyup", {
+            key: "c",
+            code: "KeyC",
+            keyCode: 67,
+            which: 67,
+            ctrlKey: !isMac,
+            metaKey: isMac,
+            bubbles: true,
+            cancelable: true
+          });
+
+          target?.dispatchEvent?.(downEvent);
+          document.dispatchEvent(downEvent);
+          document.execCommand("copy");
+          target?.dispatchEvent?.(upEvent);
+          document.dispatchEvent(upEvent);
+        } catch {
+          // Ignore errors
+        }
+      }
+    });
+
+    // Some pages respond better in isolated world; attempt there too.
+    await chrome.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      func: () => {
+        try {
+          document.execCommand("copy");
+        } catch {
+          // Ignore errors
+        }
+      }
+    });
+  } catch {
+    // Ignore
+  }
+}
+
+async function tryDebuggerClipboardFallback(tabId) {
+  const debuggee = { tabId };
+  let attachedHere = false;
+
+  try {
+    const targets = await chrome.debugger.getTargets();
+    const target = targets.find((item) => item.tabId === tabId && item.type === "page");
+    if (target?.attached) {
+      console.warn("[QBT] Skipping debugger fallback because the tab is already being debugged", { tabId });
+      return false;
+    }
+
+    await chrome.debugger.attach(debuggee, DEBUGGER_PROTOCOL_VERSION);
+    attachedHere = true;
+
+    await chrome.debugger.sendCommand(debuggee, "Page.bringToFront");
+    await dispatchNativeCopyShortcut(debuggee);
+    return true;
+  } catch (error) {
+    console.warn("[QBT] Debugger clipboard fallback failed", { tabId, error });
+    return false;
+  } finally {
+    if (attachedHere) {
+      try {
+        await chrome.debugger.detach(debuggee);
+      } catch {
+        // Ignore detach errors
+      }
+    }
+  }
+}
+
+async function dispatchNativeCopyShortcut(debuggee) {
+  const isMac = /mac/i.test(navigator.userAgent || navigator.platform || "");
+  const modifierKey = isMac
+    ? {
+        key: "Meta",
+        code: "MetaLeft",
+        windowsVirtualKeyCode: 91,
+        nativeVirtualKeyCode: 91,
+        modifiers: 4
+      }
+    : {
+        key: "Control",
+        code: "ControlLeft",
+        windowsVirtualKeyCode: 17,
+        nativeVirtualKeyCode: 17,
+        modifiers: 2
+      };
+
+  await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
+    type: "rawKeyDown",
+    key: modifierKey.key,
+    code: modifierKey.code,
+    windowsVirtualKeyCode: modifierKey.windowsVirtualKeyCode,
+    nativeVirtualKeyCode: modifierKey.nativeVirtualKeyCode,
+    modifiers: modifierKey.modifiers
+  });
+
+  await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
+    type: "rawKeyDown",
+    key: "c",
+    code: "KeyC",
+    windowsVirtualKeyCode: 67,
+    nativeVirtualKeyCode: 67,
+    modifiers: modifierKey.modifiers
+  });
+
+  await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
+    type: "keyUp",
+    key: "c",
+    code: "KeyC",
+    windowsVirtualKeyCode: 67,
+    nativeVirtualKeyCode: 67,
+    modifiers: modifierKey.modifiers
+  });
+
+  await chrome.debugger.sendCommand(debuggee, "Input.dispatchKeyEvent", {
+    type: "keyUp",
+    key: modifierKey.key,
+    code: modifierKey.code,
+    windowsVirtualKeyCode: modifierKey.windowsVirtualKeyCode,
+    nativeVirtualKeyCode: modifierKey.nativeVirtualKeyCode
+  });
+}
+
+function tryCopySelection(tabId) {
+  return tryClipboardFallback(tabId);
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isLikelyPdfTab(tab) {
+  const url = (tab?.url || "").toLowerCase();
+  const title = (tab?.title || "").toLowerCase();
+  return (
+    url.startsWith("file://") ||
+    url.startsWith("blob:") ||
+    url.includes(".pdf") ||
+    url.includes("pdf") ||
+    title.includes(".pdf")
+  );
+}
+
+let offscreenDocumentCreation;
+
+async function ensureOffscreenClipboardDocument() {
+  if (!chrome.offscreen?.createDocument) {
+    throw new Error("Offscreen API is unavailable.");
+  }
+
+  const offscreenUrl = chrome.runtime.getURL(OFFSCREEN_CLIPBOARD_PATH);
+  const alreadyCreated = await hasOffscreenDocument(offscreenUrl);
+  if (alreadyCreated) {
+    return;
+  }
+
+  if (offscreenDocumentCreation) {
+    await offscreenDocumentCreation;
+    return;
+  }
+
+  offscreenDocumentCreation = chrome.offscreen.createDocument({
+    url: OFFSCREEN_CLIPBOARD_PATH,
+    reasons: ["CLIPBOARD"],
+    justification: "Read and restore clipboard around PDF copy fallback for Alt+T translation."
+  });
+
+  try {
+    await offscreenDocumentCreation;
+  } finally {
+    offscreenDocumentCreation = undefined;
+  }
+}
+
+async function hasOffscreenDocument(offscreenUrl) {
+  if (chrome.runtime.getContexts) {
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ["OFFSCREEN_DOCUMENT"],
+      documentUrls: [offscreenUrl]
+    });
+    return contexts.length > 0;
+  }
+
+  if (self.clients?.matchAll) {
+    const matchedClients = await self.clients.matchAll();
+    return matchedClients.some((client) => client.url === offscreenUrl);
+  }
+
+  return false;
+}
+
+function sendRuntimeMessage(message) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(message, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+        return;
+      }
+      resolve(response);
+    });
+  });
+}
+
+async function readClipboardTextViaOffscreen() {
+  try {
+    console.log("[QBT] Starting clipboard read via offscreen...");
+    await ensureOffscreenClipboardDocument();
+    console.log("[QBT] Offscreen document ready, sending READ_CLIPBOARD_TEXT message...");
+    
+    const response = await sendRuntimeMessage({
+      target: OFFSCREEN_CLIPBOARD_TARGET,
+      type: "READ_CLIPBOARD_TEXT"
+    });
+    
+    const text = typeof response?.text === "string" ? response.text : "";
+    console.log("[QBT] Clipboard read response:", { text, textLength: text.length, response });
+    return text;
+  } catch (error) {
+    console.error("[QBT] Error reading clipboard via offscreen:", error);
+    return "";
+  }
+}
+
+async function writeClipboardTextViaOffscreen(text) {
+  try {
+    await ensureOffscreenClipboardDocument();
+    const response = await sendRuntimeMessage({
+      target: OFFSCREEN_CLIPBOARD_TARGET,
+      type: "SET_CLIPBOARD_TEXT",
+      text: typeof text === "string" ? text : ""
+    });
+    return response?.ok === true;
+  } catch {
+    return false;
+  }
+}
+
+async function getPdfSelectionViaClipboard(tabId) {
+  console.log("[QBT] PDF clipboard fallback started (clipboard-only)", { tabId });
+
+  let previousClipboardText = "";
+  let probeWritten = false;
+  const clipboardProbe = `__QBT_SELECTION_PROBE__${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+  try {
+    previousClipboardText = await readClipboardTextViaOffscreen();
+    probeWritten = await writeClipboardTextViaOffscreen(clipboardProbe);
+
+    if (!probeWritten) {
+      console.warn("[QBT] Unable to prepare clipboard probe for PDF fallback", { tabId });
+      return "";
+    }
+
+    await tryCopySelection(tabId);
+    await wait(CLIPBOARD_FALLBACK_WAIT_MS);
+
+    let clipboardText = await readClipboardTextViaOffscreen();
+    let trimmedText = clipboardText.trim();
+
+    console.log("[QBT] Clipboard text read", {
+      tabId,
+      length: trimmedText.length,
+      probeMatched: trimmedText === clipboardProbe
+    });
+
+    if (!trimmedText || trimmedText === clipboardProbe) {
+      const debuggerCopyWorked = await tryDebuggerClipboardFallback(tabId);
+      if (debuggerCopyWorked) {
+        await wait(CLIPBOARD_FALLBACK_WAIT_MS);
+        clipboardText = await readClipboardTextViaOffscreen();
+        trimmedText = clipboardText.trim();
+
+        console.log("[QBT] Clipboard text after debugger fallback", {
+          tabId,
+          length: trimmedText.length,
+          probeMatched: trimmedText === clipboardProbe
+        });
+      }
+    }
+
+    if (!trimmedText || trimmedText === clipboardProbe) {
+      return "";
+    }
+
+    return trimmedText;
+  } catch (error) {
+    console.error("[QBT] Error reading clipboard", { tabId, error });
+    return "";
+  } finally {
+    if (probeWritten) {
+      await writeClipboardTextViaOffscreen(previousClipboardText);
+    }
+  }
+}
+
+async function extractFromPDFViewer(tabId) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      world: "MAIN",
+      func: () => {
+        // Try to extract from Chrome's built-in PDF viewer
+        const candidates = [];
+
+        // Method 1: Standard window.getSelection()
+        const selection = window.getSelection()?.toString?.()?.trim() || "";
+        if (selection) {
+          candidates.push(selection);
+        }
+
+        // Method 2: Check for selected elements in PDF text layers
+        const textLayers = document.querySelectorAll(".textLayer");
+        for (const layer of textLayers) {
+          const text = layer.innerText?.trim() || "";
+          if (text && text.length > 0 && text.length < 5000) {
+            candidates.push(text);
+          }
+        }
+
+        // Method 3: Check shadow DOM for PDF elements
+        const allElements = document.querySelectorAll("*");
+        for (const el of allElements) {
+          if (el.shadowRoot) {
+            try {
+              const shadowText = el.shadowRoot.getSelection?.()?.toString?.()?.trim() || "";
+              if (shadowText) {
+                candidates.push(shadowText);
+              }
+            } catch (e) {
+              // Ignore shadow DOM errors
+            }
+          }
+        }
+
+        // Return longest non-empty candidate
+        return candidates
+          .filter(c => c && c.length > 0)
+          .sort((a, b) => b.length - a.length)[0] || "";
+      }
+    });
+
+    // Collect results from all frames
+    for (const result of results) {
+      const text = (result.result || "").trim();
+      if (text && text.length > 2) {
+        return text;
+      }
+    }
+
+    return "";
+  } catch {
+    return "";
+  }
+}
+
 function getSelectionFromTab(tabId) {
   return new Promise((resolve) => {
     chrome.tabs.sendMessage(tabId, { type: "GET_SELECTION" }, (response) => {
       if (chrome.runtime.lastError) {
         getSelectionViaScript(tabId).then(resolve);
+        return;
+      }
+
+      const contentSelection = (response?.text || "").trim();
+      if (contentSelection) {
+        resolve(contentSelection);
+        return;
+      }
+
+      getSelectionViaScript(tabId).then(resolve);
+    });
+  });
+}
+
+function getRecentCopiedTextFromTab(tabId) {
+  return new Promise((resolve) => {
+    chrome.tabs.sendMessage(tabId, { type: "GET_RECENT_COPIED_TEXT" }, (response) => {
+      if (chrome.runtime.lastError) {
+        resolve("");
         return;
       }
 
@@ -236,12 +729,41 @@ function getSelectionFromTab(tabId) {
 
 async function getSelectionViaScript(tabId) {
   try {
-    const [result] = await chrome.scripting.executeScript({
-      target: { tabId },
-      func: () => (window.getSelection()?.toString() || "").trim()
+    // Try all frames since PDFs might have content in iframes
+    const results = await chrome.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      func: () => {
+        const directSelection = (window.getSelection?.()?.toString?.() || "").trim();
+        if (directSelection) {
+          return directSelection;
+        }
+
+        const active = document.activeElement;
+        if (
+          active instanceof HTMLTextAreaElement ||
+          (active instanceof HTMLInputElement && /^(text|search|url|tel|password)$/i.test(active.type))
+        ) {
+          const start = active.selectionStart || 0;
+          const end = active.selectionEnd || 0;
+          if (end > start) {
+            return (active.value || "").slice(start, end).trim();
+          }
+        }
+
+        return "";
+      }
     });
 
-    return (result?.result || "").trim();
+    // Collect and return longest selection found
+    let longestText = "";
+    for (const result of results) {
+      const text = (result.result || "").trim();
+      if (text && text.length > longestText.length) {
+        longestText = text;
+      }
+    }
+
+    return longestText;
   } catch {
     return "";
   }
@@ -259,6 +781,8 @@ function sendMessageToContent(tabId, payload) {
     chrome.tabs.sendMessage(tabId, {
       type: "SHOW_TRANSLATION",
       payload
+    }, {
+      frameId: 0
     }, () => {
       resolve(!chrome.runtime.lastError);
     });
@@ -441,6 +965,39 @@ function normalizeLanguage(languageCode) {
   }
 
   return LANGUAGE_NAMES[normalized] ? normalized : DEFAULT_SETTINGS.targetLanguage;
+}
+
+function normalizeSelectedText(text, options = {}) {
+  if (typeof text !== "string") {
+    return "";
+  }
+
+  const isPDF = options?.isPDF === true;
+  let normalized = text
+    .replace(/\u00ad/g, "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/\r\n?/g, "\n");
+
+  if (isPDF) {
+    // Join words split by PDF line wrapping: "pro-\ngram" -> "program".
+    normalized = normalized.replace(/([A-Za-z0-9])\-\s*\n\s*([A-Za-z0-9])/g, "$1$2");
+  }
+
+  normalized = normalized
+    .replace(/[ \t\f\v]+/g, " ")
+    .replace(/\s*\n\s*/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  return normalized;
+}
+
+function getNoTextMessage(isPDF) {
+  if (isPDF) {
+    return "Nothing to translate from PDF.\nTry this:\n- Select text in the PDF\n- Press Alt+T";
+  }
+
+  return "Nothing to translate. Select text and press Alt+T again.";
 }
 
 function getLanguageName(languageCode) {

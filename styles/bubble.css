@@ -91,3 +91,25 @@
 .qbt-error .qbt-title {
   color: #8d1f1f;
 }
+
+@keyframes qbt-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.qbt-loading .qbt-translated::after {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #8dbfe6;
+  border-top-color: #275a7e;
+  border-radius: 50%;
+  animation: qbt-spin 0.8s linear infinite;
+  margin-left: 8px;
+  vertical-align: middle;
+}

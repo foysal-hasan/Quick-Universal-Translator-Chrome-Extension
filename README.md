@@ -5,7 +5,7 @@ Translate selected text from any language to your chosen target language using o
 ## Features
 
 - Right-click selected text -> `Translate to <your target language>`
-- Keyboard shortcut: `Ctrl+Shift+B` (`Command+Shift+B` on macOS)
+- Keyboard shortcut: `Alt+T`
 - Source language is auto-detected from selected text
 - Result shows in a floating bubble on the same page with detected source and target languages
 - Copy translated text with one click
@@ -26,14 +26,14 @@ Translate selected text from any language to your chosen target language using o
 2. Select text on any web page
 2. Use one of these:
    - Right-click -> **Translate to your selected target language**
-   - Press `Ctrl+Shift+B`
+   - Press `Alt+T`
 3. Read translated output in the page bubble
 
 ## PDF Books
 
 - For local PDF files (`file:///...`), open `chrome://extensions`, find this extension, and enable **Allow access to file URLs**.
 - In PDF viewers where normal content messaging fails, the extension injects the same style floating bubble directly into the page as fallback.
-- If keyboard shortcut cannot read selection in a PDF viewer, use right-click on selected text and choose the translate menu item.
+- When `Alt+T` cannot directly read selection in a PDF viewer, the extension tries a temporary Ctrl+C-style copy fallback, reads that copied text, translates it, and restores your previous clipboard content.
 
 ## Free Service Note
 

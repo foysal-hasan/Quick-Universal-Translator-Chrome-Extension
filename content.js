@@ -1,4 +1,28 @@
 const BUBBLE_ID = "quick-bangla-translator-bubble";
+const SELECTION_CACHE_TTL_MS = 20000;
+const COPIED_TEXT_CACHE_TTL_MS = 30000;
+
+let lastSelectedText = "";
+let lastSelectedAt = 0;
+let lastCopiedText = "";
+let lastCopiedAt = 0;
+
+// Track selection changes across documents
+if (document.addEventListener) {
+  document.addEventListener("selectionchange", updateSelectionCache);
+  document.addEventListener("mouseup", updateSelectionCache);
+  document.addEventListener("keyup", updateSelectionCache);
+  document.addEventListener("click", updateSelectionCache);
+  document.addEventListener("copy", updateCopiedTextCache, true);
+}
+
+function updateSelectionCache() {
+  const selection = getSelectedText();
+  if (selection && selection.length > 0) {
+    lastSelectedText = selection;
+    lastSelectedAt = Date.now();
+  }
+}
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "GET_SELECTION") {
@@ -6,19 +30,46 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "GET_RECENT_COPIED_TEXT") {
+    sendResponse({ text: getRecentCopiedText() });
+    return true;
+  }
+
   if (message?.type === "SHOW_TRANSLATION") {
+    if (!isTopLevelFrame()) {
+      return false;
+    }
+
     showTranslationBubble(message.payload || {});
   }
 
   return false;
 });
 
+function updateCopiedTextCache() {
+  const copied = getSelectedText();
+  if (copied && copied.length > 0) {
+    lastCopiedText = copied;
+    lastCopiedAt = Date.now();
+  }
+}
+
+function getRecentCopiedText() {
+  if (Date.now() - lastCopiedAt <= COPIED_TEXT_CACHE_TTL_MS && lastCopiedText) {
+    return lastCopiedText;
+  }
+
+  return "";
+}
+
 function getSelectedText() {
+  // First, try direct selection
   const selection = (window.getSelection()?.toString() || "").trim();
-  if (selection) {
+  if (selection && selection.length > 0) {
     return selection;
   }
 
+  // Check for input/textarea selection
   const active = document.activeElement;
   if (
     active instanceof HTMLTextAreaElement ||
@@ -31,6 +82,11 @@ function getSelectedText() {
     }
   }
 
+  // Use cached selection if still valid (for PDF viewers where selection disappears quickly)
+  if (Date.now() - lastSelectedAt <= SELECTION_CACHE_TTL_MS && lastSelectedText) {
+    return lastSelectedText;
+  }
+
   return "";
 }
 
@@ -39,6 +95,7 @@ function showTranslationBubble(payload) {
     original = "",
     translated = "",
     isError = false,
+    isLoading = false,
     sourceLanguageName = "Auto",
     targetLanguageName = "Target",
     showOriginalText = true,
@@ -49,20 +106,36 @@ function showTranslationBubble(payload) {
   const title = bubble.querySelector(".qbt-title");
   const translatedNode = bubble.querySelector(".qbt-translated");
   const originalNode = bubble.querySelector(".qbt-original");
+  const copyButton = bubble.querySelector('[data-action="copy"]');
 
   if (!title || !translatedNode || !originalNode) {
     return;
   }
 
-  title.textContent = isError
+  title.textContent = isLoading
+    ? "Translating..."
+    : isError
     ? "Translation Error"
     : `Translation: ${sourceLanguageName} -> ${targetLanguageName}`;
+  
   translatedNode.textContent = translated || "No translation available.";
   originalNode.textContent = showOriginalText && original ? `Original: ${original}` : "";
   originalNode.style.display = showOriginalText ? "block" : "none";
+  
+  // Disable copy button during loading
+  if (copyButton) {
+    copyButton.disabled = isLoading;
+    copyButton.style.opacity = isLoading ? "0.5" : "1";
+  }
+  
   applyBubblePositionClass(bubble, bubblePosition);
   bubble.classList.remove("qbt-hidden", "qbt-error");
   bubble.classList.toggle("qbt-error", Boolean(isError));
+  bubble.classList.toggle("qbt-loading", Boolean(isLoading));
+}
+
+function isTopLevelFrame() {
+  return window.top === window;
 }
 
 function applyBubblePositionClass(bubble, bubblePosition) {
