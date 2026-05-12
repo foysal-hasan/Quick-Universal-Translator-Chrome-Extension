@@ -1239,11 +1239,7 @@ function normalizeSelectedText(text, options = {}) {
 }
 
 function getNoTextMessage(isPDF) {
-  if (isPDF) {
-    return "Nothing to translate from PDF.\nTry this:\n- Select text in the PDF\n- Press Alt+T";
-  }
-
-  return "Nothing to translate. Select text and press Alt+T again.";
+  return "Webpage: select text, then press Ctrl+T.\nPDF: select text, press Ctrl+C, then press Ctrl+T.\nClose popup: press Ctrl+R.";
 }
 
 function getLanguageName(languageCode) {

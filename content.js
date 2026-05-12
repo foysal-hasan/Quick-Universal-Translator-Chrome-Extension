@@ -14,6 +14,7 @@ if (document.addEventListener) {
   document.addEventListener("keyup", updateSelectionCache);
   document.addEventListener("click", updateSelectionCache);
   document.addEventListener("copy", updateCopiedTextCache, true);
+  document.addEventListener("keydown", handleCloseShortcut, true);
 }
 
 function updateSelectionCache() {
@@ -137,6 +138,40 @@ function showTranslationBubble(payload) {
   bubble.classList.toggle("qbt-loading", Boolean(isLoading));
 }
 
+function handleCloseShortcut(event) {
+  if (!event.ctrlKey || event.altKey || event.shiftKey || event.metaKey) {
+    return;
+  }
+
+  if ((event.key || "").toLowerCase() !== "r") {
+    return;
+  }
+
+  if (!closeTranslationPopup()) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function closeTranslationPopup() {
+  let closed = false;
+  const bubble = document.getElementById(BUBBLE_ID);
+  if (bubble && !bubble.classList.contains("qbt-hidden")) {
+    bubble.classList.add("qbt-hidden");
+    closed = true;
+  }
+
+  const fallbackBubble = document.getElementById("quick-translator-fallback-bubble");
+  if (fallbackBubble) {
+    fallbackBubble.remove();
+    closed = true;
+  }
+
+  return closed;
+}
+
 function isTopLevelFrame() {
   return window.top === window;
 }
@@ -189,7 +224,7 @@ function ensureBubble() {
 
     const action = target.getAttribute("data-action");
     if (action === "close") {
-      bubble.classList.add("qbt-hidden");
+      closeTranslationPopup();
       return;
     }
 

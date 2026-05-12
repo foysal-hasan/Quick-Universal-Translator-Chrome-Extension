@@ -32,7 +32,7 @@
     },
     "close-translation-popup": {
       "suggested_key": {
-        "default": "Alt+R"
+        "default": "Ctrl+R"
       },
       "description": "Close translation popup"
     }
