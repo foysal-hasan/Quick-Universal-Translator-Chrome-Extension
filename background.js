@@ -419,7 +419,7 @@ async function logClipboardText() {
   try {
     // Request text from clipboard
     const text = await navigator?.clipboard?.readText();
-    console.log("Last copied text:", text);
+    // console.log("Last copied text:", text);
   } catch (err) {
     console.log("Failed to read clipboard contents: ", err);
   }

@@ -37,10 +37,13 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message?.type === "SHOW_TRANSLATION") {
     if (!isTopLevelFrame()) {
+      sendResponse({ ok: false });
       return false;
     }
 
     showTranslationBubble(message.payload || {});
+    sendResponse({ ok: true });
+    return true;
   }
 
   return false;
