@@ -29,6 +29,12 @@
         "default": "Alt+C"
       },
       "description": "Print last copied clipboard text"
+    },
+    "close-translation-popup": {
+      "suggested_key": {
+        "default": "Alt+R"
+      },
+      "description": "Close translation popup"
     }
   },
   "icons": {

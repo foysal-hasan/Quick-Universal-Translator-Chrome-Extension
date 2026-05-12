@@ -107,6 +107,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 // }
 
 chrome.commands.onCommand.addListener(async (command) => {
+  if (command === "close-translation-popup") {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) {
+      return;
+    }
+
+    await closeTranslationPopup(tab.id);
+    return;
+  }
+
   // if (command === "print-clipboard-text") {
 
   //   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -983,6 +993,27 @@ async function sendResult(tabId, payload) {
   const delivered = await sendMessageToContent(tabId, payload);
   if (!delivered) {
     await showFallbackBubble(tabId, payload);
+  }
+}
+
+async function closeTranslationPopup(tabId) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const contentBubble = document.getElementById("quick-bangla-translator-bubble");
+        if (contentBubble) {
+          contentBubble.classList.add("qbt-hidden");
+        }
+
+        const fallbackBubble = document.getElementById("quick-translator-fallback-bubble");
+        if (fallbackBubble) {
+          fallbackBubble.remove();
+        }
+      }
+    });
+  } catch (error) {
+    console.error("[QBT] Close popup failed:", error);
   }
 }
 
