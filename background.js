@@ -413,3 +413,17 @@ function normalizeLanguage(languageCode) {
 function getLanguageName(languageCode) {
   return LANGUAGE_NAMES[languageCode] || languageCode || "Unknown";
 }
+
+
+async function logClipboardText() {
+  try {
+    // Request text from clipboard
+    const text = await navigator?.clipboard?.readText();
+    console.log("Last copied text:", text);
+  } catch (err) {
+    console.log("Failed to read clipboard contents: ", err);
+  }
+}
+
+// Trigger the function
+logClipboardText();

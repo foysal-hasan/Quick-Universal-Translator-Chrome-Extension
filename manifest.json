@@ -8,19 +8,27 @@
     "activeTab",
     "scripting",
     "storage",
-    "debugger",
     "webRequest",
     "offscreen",
     "clipboardRead",
     "clipboardWrite"
   ],
-  "host_permissions": ["https://translate.googleapis.com/*", "file:///*"],
+  "host_permissions": [
+    "https://translate.googleapis.com/*",
+    "file:///*"
+  ],
   "commands": {
     "translate-selection": {
       "suggested_key": {
         "default": "Alt+T"
       },
       "description": "Translate selected text"
+    },
+    "print-clipboard-text": {
+      "suggested_key": {
+        "default": "Alt+C"
+      },
+      "description": "Print last copied clipboard text"
     }
   },
   "icons": {
@@ -34,9 +42,15 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "css": ["styles/bubble.css"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "styles/bubble.css"
+      ],
       "run_at": "document_start",
       "all_frames": true,
       "match_about_blank": true

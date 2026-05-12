@@ -8,7 +8,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       .then((text) => {
         sendResponse({ text: (text || "").trim() });
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error("[QBT] Offscreen clipboard read failed:", error);
         sendResponse({ text: "" });
       });
 
