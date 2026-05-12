@@ -1,54 +1,70 @@
-# Quick Bangla Translator (Chrome Extension)
+# Quick Universal Translator
 
-Translate selected text from any language to your chosen target language using only free services (no paid API key).
+Translate selected text from any language to your chosen target language in Chrome. Source language is detected automatically and the result appears in a floating page popup.
 
 ## Features
 
-- Right-click selected text -> `Translate to <your target language>`
-- Keyboard shortcut: `Alt+T`
-- Source language is auto-detected from selected text
-- Result shows in a floating bubble on the same page with detected source and target languages
-- Copy translated text with one click
-- Toggle to show or hide original text below the translation
-- Choose bubble position on screen (top-left, top-right, bottom-left, bottom-right)
+- Translate selected webpage text from the keyboard
+- Translate copied PDF text from the keyboard
+- Right-click selected text and translate it from the context menu
+- Auto-detect source language
+- Choose the target language from the extension popup
+- Show or hide the original text below the translation
+- Choose popup position: top-left, top-right, bottom-left, or bottom-right
+- Copy translated text from the translation popup
+- Close the translation popup with a shortcut
+- Works without a paid translation API key
 
-## Install (Unpacked)
+## Shortcuts
 
-1. Open Chrome and go to `chrome://extensions/`
-2. Turn on **Developer mode**
-3. Click **Load unpacked**
-4. Select this folder:
-   - `Translator`
+- Webpage: select text, then press **Ctrl+T**.
+- PDF: select text, press **Ctrl+C**, then press **Ctrl+T**.
+- Close popup: press **Ctrl+R**.
+
+If Chrome does not trigger a shortcut, open `chrome://extensions/shortcuts` and assign it manually. Some shortcuts may conflict with browser defaults depending on your Chrome setup.
+
+## Install
+
+1. Open Chrome and go to `chrome://extensions/`.
+2. Turn on **Developer mode**.
+3. Click **Load unpacked**.
+4. Select this project folder.
+5. For local PDF files, enable **Allow access to file URLs** for this extension.
 
 ## Usage
 
-1. Open extension popup and choose target language, original-text visibility, and bubble position
-2. Select text on any web page
-2. Use one of these:
-   - Right-click -> **Translate to your selected target language**
-   - Press `Alt+T`
-3. Read translated output in the page bubble
+1. Open the extension popup.
+2. Choose your target language.
+3. Choose whether to show the original text.
+4. Choose the popup position.
+5. Use the shortcuts or context menu to translate.
 
-## PDF Books
+## PDF Usage
 
-- For local PDF files (`file:///...`), open `chrome://extensions`, find this extension, and enable **Allow access to file URLs**.
-- In PDF viewers where normal content messaging fails, the extension injects the same style floating bubble directly into the page as fallback.
-- When `Alt+T` cannot directly read selection in a PDF viewer, the extension tries a temporary Ctrl+C-style copy fallback, reads that copied text, translates it, and restores your previous clipboard content.
+Chrome's built-in PDF viewer does not reliably expose selected text to extension scripts. For PDF files, use the clipboard workflow:
 
-## Free Service Note
+1. Select text in the PDF.
+2. Press **Ctrl+C**.
+3. Press **Ctrl+T** to translate the copied text.
 
-This extension uses a free public translation endpoint from Google Translate (`translate.googleapis.com`) and does not require a paid account or API key.
+## Translation Service
 
-## Current Limitation
+This extension uses the free public Google Translate endpoint at `translate.googleapis.com`. It does not require a paid API key.
 
-- Internet is required for translation requests in this version.
-- `chrome://` pages and some extension/system pages do not allow content scripts.
+## Limitations
+
+- Internet access is required for translation.
+- `chrome://` pages and other restricted browser pages do not allow content scripts.
+- PDF translation depends on copying selected PDF text to the clipboard first.
+- Browser-reserved shortcuts may need to be changed in `chrome://extensions/shortcuts`.
 
 ## Files
 
-- `manifest.json` - Extension config
-- `background-v2.js` - Menu/shortcut logic, language settings, and translation request
-- `content.js` - Selection capture and bubble rendering
-- `styles/bubble.css` - Bubble UI styles
-- `popup/popup.html` - Language settings UI
-- `popup/popup.js` - Target language selection logic
+- `manifest.json` - Extension configuration, permissions, and commands
+- `background-v2.js` - Context menu, shortcuts, settings, clipboard flow, and translation requests
+- `content.js` - Selection capture and translation popup rendering
+- `styles/bubble.css` - Translation popup styles
+- `popup/popup.html` - Settings popup UI
+- `popup/popup.js` - Settings popup behavior
+- `offscreen/clipboard.html` - Offscreen clipboard document
+- `offscreen/clipboard.js` - Clipboard read/write helper
