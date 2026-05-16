@@ -1239,7 +1239,7 @@ function normalizeSelectedText(text, options = {}) {
 }
 
 function getNoTextMessage(isPDF) {
-  return "Webpage: select text, then press ALT+T.\nPDF: select text, press Ctrl+C, then press ALT+T.\nClose popup: press Ctrl+R.";
+  return "Webpage: select text, then press ALT+T.\nPDF: select text, press Ctrl+C, then press ALT+T.\nClose popup: press ALT+R.";
 }
 
 function getLanguageName(languageCode) {
